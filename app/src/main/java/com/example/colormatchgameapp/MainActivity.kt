@@ -3,8 +3,6 @@ package com.example.colormatchgameapp
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -18,13 +16,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                LevelUpTapGameScreen()
+                IdleClickerGameScreen()
             }
         }
     }
@@ -32,53 +31,33 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LevelUpTapGameScreen() {
-    // ゲームのステータス状態
-    var level by remember { mutableStateOf(1) }
-    var currentExp by remember { mutableStateOf(0) }
-    var totalTaps by remember { mutableStateOf(0) }
-    var isJustLeveledUp by remember { mutableStateOf(false) }
+fun IdleClickerGameScreen() {
+    // ステータス（所持ポイント・威力）
+    var points by remember { mutableStateOf(0) }
+    var tapPower by remember { mutableStateOf(1) }       // 1タップあたりの威力
+    var autoPower by remember { mutableStateOf(0) }      // 1秒あたりの自動獲得ポイント
 
-    // 必要経験値（レベル×10タップでレベルアップ）
-    val requiredExp = level * 10
+    // 強化レベルと必要なコスト
+    var tapLevel by remember { mutableStateOf(1) }
+    var tapCost by remember { mutableStateOf(10) }
 
-    // レベルに応じた称号リスト
-    val titles = listOf(
-        "見習いタッパー 🐣",
-        "駆け出しハンター 🗡️",
-        "ベテラン連打王 ⚔️",
-        "神速の指先 ⚡",
-        "タップの覇者 👑",
-        "伝説のクリッカー 🌟",
-        "神の領域 🌌"
-    )
-    val currentTitle = titles.getOrElse((level - 1) / 2) { "無敵の存在 ♾️" }
+    var autoLevel by remember { mutableStateOf(0) }
+    var autoCost by remember { mutableStateOf(20) }
 
-    // レベルアップ時のゴールド発光アニメーション
-    val cardBgColor by animateColorAsState(
-        targetValue = if (isJustLeveledUp) Color(0xFFFFD700) else MaterialTheme.colorScheme.secondaryContainer,
-        animationSpec = tween(durationMillis = 300),
-        label = "LevelUpAnimation"
-    )
-
-    // タップ時の処理
-    fun handleTap() {
-        totalTaps++
-        currentExp++
-        isJustLeveledUp = false
-
-        // 必要EXPに達したらレベルアップ！
-        if (currentExp >= requiredExp) {
-            currentExp = 0
-            level++
-            isJustLeveledUp = true
+    // ⏱️ 自動ポイント加算ループ（1秒ごとに autoPower 分だけポイント増加）
+    LaunchedEffect(autoPower) {
+        while (true) {
+            delay(1000L) // 1秒待つ
+            if (autoPower > 0) {
+                points += autoPower
+            }
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("⚔️ タップ・レベルアップ RPG", fontWeight = FontWeight.Bold) },
+                title = { Text("⚔️ 放置＆連打クリッカーRPG", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
@@ -89,14 +68,14 @@ fun LevelUpTapGameScreen() {
             modifier = Modifier
                 .padding(paddingValues)
                 .fillMaxSize()
-                .padding(20.dp),
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // 1. レベル & 称号 & EXPゲージ
+            // 1. ポイント＆ステータス表示
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = cardBgColor),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(
@@ -105,48 +84,37 @@ fun LevelUpTapGameScreen() {
                         .fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    Text("所持ポイント", fontSize = 14.sp, color = Color.Gray)
                     Text(
-                        text = if (isJustLeveledUp) "✨ LEVEL UP! ✨" else currentTitle,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isJustLeveledUp) Color(0xFFD81B60) else MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Lv. $level",
-                        fontSize = 42.sp,
-                        fontWeight = FontWeight.ExtraBold,
+                        text = "💰 $points PT",
+                        fontSize = 36.sp,
+                        fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // 経験値プログレスバー
-                    val progress = currentExp.toFloat() / requiredExp.toFloat()
-                    LinearProgressIndicator(
-                        progress = progress,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(12.dp)
-                            .clip(RoundedCornerShape(6.dp)),
-                        color = Color(0xFF4CAF50),
-                        trackColor = Color.LightGray.copy(alpha = 0.5f)
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "EXP: $currentExp / $requiredExp (あと ${requiredExp - currentExp} タップ)",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceAround
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("1タップ威力", fontSize = 12.sp, color = Color.Gray)
+                            Text("⚡ +$tapPower PT", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("自動獲得 (毎秒)", fontSize = 12.sp, color = Color.Gray)
+                            Text("🤖 +$autoPower PT/秒", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
 
             // 2. 巨大タップボタン
             Surface(
                 modifier = Modifier
-                    .size(200.dp)
+                    .size(180.dp)
                     .clip(CircleShape)
-                    .clickable { handleTap() },
+                    .clickable { points += tapPower }, // タップで威力分だけ増える
                 color = MaterialTheme.colorScheme.primary,
                 shadowElevation = 8.dp
             ) {
@@ -155,58 +123,85 @@ fun LevelUpTapGameScreen() {
                     modifier = Modifier.fillMaxSize()
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "💥",
-                            fontSize = 60.sp
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("💥", fontSize = 50.sp)
                         Text(
                             text = "TAP!",
-                            fontSize = 28.sp,
+                            fontSize = 24.sp,
                             fontWeight = FontWeight.Black,
                             color = Color.White
+                        )
+                        Text(
+                            text = "+$tapPower",
+                            fontSize = 14.sp,
+                            color = Color.Yellow,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
             }
 
-            // 3. 通算成績 & リセットボタン
+            // 3. ショップ / アップグレードエリア
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Card(
+                Text("🛒 強化ショップ", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+
+                // 強化①：タップ力強化
+                Button(
+                    onClick = {
+                        if (points >= tapCost) {
+                            points -= tapCost
+                            tapLevel++
+                            tapPower += 1
+                            tapCost = (tapCost * 1.5).toInt() // 次のコストを1.5倍に
+                        }
+                    },
+                    enabled = points >= tapCost, // ポイントが足りない時はボタンを押せない
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Row(
-                        modifier = Modifier
-                            .padding(16.dp)
-                            .fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("通算タップ数", fontSize = 12.sp, color = Color.Gray)
-                            Text("$totalTaps 回", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Column {
+                            Text("⚡ タップ威力強化 (Lv.$tapLevel)", fontWeight = FontWeight.Bold)
+                            Text("タップ時の獲得量を +1 増加", fontSize = 11.sp)
                         }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("1タップ威力", fontSize = 12.sp, color = Color.Gray)
-                            Text("1 EXP", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        }
+                        Text("💰 $tapCost PT", fontWeight = FontWeight.Bold)
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                TextButton(
+                // 強化②：自動獲得強化（放置収益）
+                Button(
                     onClick = {
-                        level = 1
-                        currentExp = 0
-                        totalTaps = 0
-                        isJustLeveledUp = false
-                    }
+                        if (points >= autoCost) {
+                            points -= autoCost
+                            autoLevel++
+                            autoPower += 1
+                            autoCost = (autoCost * 1.6).toInt() // 次のコストを1.6倍に
+                        }
+                    },
+                    enabled = points >= autoCost,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF4CAF50) // 緑色のボタン
+                    )
                 ) {
-                    Text("🔄 最初からやり直す", color = Color.Gray, fontSize = 12.sp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("🤖 自動収益ロボ雇用 (Lv.$autoLevel)", fontWeight = FontWeight.Bold)
+                            Text("毎秒の自動獲得を +1/秒 増加", fontSize = 11.sp)
+                        }
+                        Text("💰 $autoCost PT", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
